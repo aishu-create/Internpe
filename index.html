@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java Backend - Rock Paper Scissors</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Reliable embedded online music URL -->
+    <audio id="bg-music" loop>
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+    </audio>
+
+    <div class="top-panel">
+        <h1 class="glow-text">Rock Paper Scissors - Java Server Edition</h1>
+        
+        <div class="name-inputs">
+            <input type="text" id="p1-name-input" class="name-input" placeholder="Enter P1 Name" value="Player 1" onkeyup="updateNames()">
+            <input type="text" id="p2-name-input" class="name-input" placeholder="Enter P2 Name" value="Player 2" onkeyup="updateNames()" style="display: none;">
+        </div>
+
+        <div class="settings-bar">
+            <button id="music-btn" class="setting-btn" onclick="toggleMusic()">🔇 Music Off</button>
+            <button id="mode-btn" class="setting-btn" onclick="toggleMode()">🎮 Mode: vs Computer</button>
+        </div>
+
+        <div class="scoreboard">
+            <h3>SCORE | <span id="p1-score-name">Player 1</span>: <span id="s1">0</span> &nbsp;-&nbsp; <span id="p2-name-score">Computer</span>: <span id="s2">0</span></h3>
+        </div>
+    </div>
+
+    <!-- 3D Player Boxes -->
+    <div class="center-panel">
+        <div class="player-box active-turn" id="p1-box">
+            <div class="header" id="p1-header">👤 Player 1</div>
+            <div class="choice-icon" id="p1-choice">❓</div>
+            <div class="result-text" id="p1-result"></div>
+        </div>
+
+        <div class="player-box" id="p2-box">
+            <div class="header" id="p2-header">🤖 Computer</div>
+            <div class="choice-icon" id="p2-choice">❓</div>
+            <div class="result-text" id="p2-result"></div>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls-container">
+        <div class="bottom-panel" id="p1-controls">
+            <button class="play-btn p1-btn" onclick="playP1(0)" title="Rock">🪨</button>
+            <button class="play-btn p1-btn" onclick="playP1(1)" title="Paper">📄</button>
+            <button class="play-btn p1-btn" onclick="playP1(2)" title="Scissors">✂️</button>
+        </div>
+
+        <button class="reset-btn" onclick="resetGame()">RESET GAME</button>
+
+        <div class="bottom-panel" id="p2-controls" style="display: none;">
+            <button class="play-btn p2-btn" onclick="playP2(0)" title="Rock">🪨</button>
+            <button class="play-btn p2-btn" onclick="playP2(1)" title="Paper">📄</button>
+            <button class="play-btn p2-btn" onclick="playP2(2)" title="Scissors">✂️</button>
+        </div>
+    </div>
+
+    <!-- Confetti Library for Celebration -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,82 +1,57 @@
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-
-import java.io.File;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpExchange;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.nio.file.Files;
-import java.util.Random;
 
 public class GameServer {
-
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
-        server.createContext("/", new StaticFileHandler());
-        server.createContext("/api/play", new GameLogicHandler());
+        server.createContext("/api/aimove", new AIMoveHandler());
         server.setExecutor(null);
+        System.out.println("Backend Server is LIVE on http://localhost:8080");
         server.start();
-        System.out.println("Backend Server is running!");
-        System.out.println("Open your browser and go to: http://localhost:8080/index.html");
     }
 
-    static class StaticFileHandler implements HttpHandler {
+    static class AIMoveHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            String path = exchange.getRequestURI().getPath();
-            if (path.equals("/")) path = "/index.html"; 
+            // Enable Cross-Origin Resource Sharing (CORS) for the frontend
+            exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+            
+            String query = exchange.getRequestURI().getQuery();
+            if (query != null && query.startsWith("board=")) {
+                String boardState = query.split("=")[1];
+                char[] board = boardState.toCharArray();
 
-            File file = new File("." + path);
-            if (file.exists() && !file.isDirectory()) {
-                exchange.sendResponseHeaders(200, file.length());
-                OutputStream os = exchange.getResponseBody();
-                Files.copy(file.toPath(), os);
-                os.close();
-            } else {
-                String response = "404 (Not Found)\n";
-                exchange.sendResponseHeaders(404, response.length());
+                int bestMove = calculateBestMove(board, 'O');
+                if (bestMove == -1) bestMove = getRandomMove(board);
+
+                String response = String.valueOf(bestMove);
+                exchange.sendResponseHeaders(200, response.length());
                 OutputStream os = exchange.getResponseBody();
                 os.write(response.getBytes());
                 os.close();
             }
         }
-    }
 
-    static class GameLogicHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String query = exchange.getRequestURI().getQuery();
-            String[] params = query.split("&");
-            int p1Choice = Integer.parseInt(params[0].split("=")[1]);
-            int p2Choice = Integer.parseInt(params[1].split("=")[1]);
-
-            int finalP2Choice = p2Choice;
-            if (finalP2Choice == -1) {
-                finalP2Choice = new Random().nextInt(3);
+        private int calculateBestMove(char[] board, char player) {
+            int[][] combos = {{0,1,2}, {3,4,5}, {6,7,8}, {0,3,6}, {1,4,7}, {2,5,8}, {0,4,8}, {2,4,6}};
+            // Try to win or block
+            for (char symbol : new char[]{'O', 'X'}) {
+                for (int[] c : combos) {
+                    if (board[c[0]] == symbol && board[c[1]] == symbol && board[c[2]] == '-') return c[2];
+                    if (board[c[0]] == symbol && board[c[2]] == symbol && board[c[1]] == '-') return c[1];
+                    if (board[c[1]] == symbol && board[c[2]] == symbol && board[c[0]] == '-') return c[0];
+                }
             }
+            return -1;
+        }
 
-            int winner = 0; // 0 = Tie, 1 = P1, 2 = P2
-
-            // Determine Winner
-            if (p1Choice == finalP2Choice) {
-                winner = 0;
-            } else if ((p1Choice == 0 && finalP2Choice == 2) || 
-                       (p1Choice == 1 && finalP2Choice == 0) || 
-                       (p1Choice == 2 && finalP2Choice == 1)) {
-                winner = 1;
-            } else {
-                winner = 2;
-            }
-
-            // Create a JSON response
-            String jsonResponse = String.format("{\"p2Choice\": %d, \"winner\": %d}", finalP2Choice, winner);
-
-            exchange.getResponseHeaders().set("Content-Type", "application/json");
-            exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);
-            OutputStream os = exchange.getResponseBody();
-            os.write(jsonResponse.getBytes());
-            os.close();
+        private int getRandomMove(char[] board) {
+            for (int i = 0; i < 9; i++) if (board[i] == '-') return i;
+            return -1;
         }
     }
 }

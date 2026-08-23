@@ -1,170 +1,191 @@
-const icons = ["🪨", "📄", "✂️", "❓", "✅"];
+document.addEventListener("DOMContentLoaded", () => {
+    // --- UI Elements ---
+    const ui = {
+        setup: document.getElementById('setupModal'),
+        game: document.getElementById('gameUI'),
+        board: document.getElementById('board'),
+        status: document.getElementById('statusText'),
+        bgMusic: document.getElementById('bgMusic')
+    };
 
-// UI Elements
-const p1ChoiceEl = document.getElementById('p1-choice');
-const p2ChoiceEl = document.getElementById('p2-choice');
-const p1Result = document.getElementById('p1-result');
-const p2Result = document.getElementById('p2-result');
-const music = document.getElementById('bg-music');
+    const inputs = {
+        mode: document.getElementById('modeSelect'),
+        p1Name: document.getElementById('p1Name'),
+        p2Name: document.getElementById('p2Name')
+    };
 
-// Game State
-let mode = 'pvc'; 
-let p1Selected = -1;
-let p2Selected = -1;
-let score1 = 0;
-let score2 = 0;
-let isMusicPlaying = false;
+    // --- State ---
+    let gameMode = 'pvsystem';
+    let boardData = ["-", "-", "-", "-", "-", "-", "-", "-", "-"];
+    let isGameActive = true;
+    let currentPlayer = 'X';
+    let scores = { X: 0, O: 0 };
+    let names = { X: "", O: "" };
+    let musicPlaying = false;
 
-let p1Name = "Player 1";
-let p2Name = "Computer";
+    // --- Setup Listeners ---
+    inputs.mode.addEventListener('change', (e) => {
+        inputs.p2Name.disabled = (e.target.value === 'pvsystem');
+        inputs.p2Name.value = (e.target.value === 'pvp') ? "Player 2" : "System";
+        document.getElementById('avatarP2').innerText = (e.target.value === 'pvp') ? "🥷🏼" : "🤖";
+    });
 
-// --- Custom Names Logic ---
-function updateNames() {
-    p1Name = document.getElementById('p1-name-input').value || "Player 1";
-    
-    if (mode === 'pvp') {
-        p2Name = document.getElementById('p2-name-input').value || "Player 2";
-        document.getElementById('p2-header').innerText = `👤 ${p2Name}`;
-    } else {
-        p2Name = "Computer";
-        document.getElementById('p2-header').innerText = `🤖 Computer`;
+    document.getElementById('startGameBtn').addEventListener('click', () => {
+        gameMode = inputs.mode.value;
+        names.X = inputs.p1Name.value || "Player 1";
+        names.O = inputs.p2Name.value || "System";
+
+        document.getElementById('displayP1').innerText = names.X;
+        document.getElementById('displayP2').innerText = names.O;
+
+        ui.setup.style.display = 'none';
+        ui.game.style.display = 'block';
+
+        // Start Music
+        ui.bgMusic.volume = 0.3;
+        ui.bgMusic.play().then(() => musicPlaying = true).catch(() => console.log("Music blocked by browser autoplay rules."));
+
+        speak(`Match initialized. ${names.X} versus ${names.O}. Begin.`);
+        buildBoard();
+        updateTurnUI();
+    });
+
+    document.getElementById('musicToggle').addEventListener('click', (e) => {
+        if (musicPlaying) { ui.bgMusic.pause(); e.target.innerText = "🔇 Music Off"; }
+        else { ui.bgMusic.play(); e.target.innerText = "🔊 Music On"; }
+        musicPlaying = !musicPlaying;
+    });
+
+    document.getElementById('resetRoundBtn').addEventListener('click', resetRound);
+
+    // --- Voice Assistant ---
+    function speak(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
     }
 
-    document.getElementById('p1-header').innerText = `👤 ${p1Name}`;
-    document.getElementById('p1-score-name').innerText = p1Name;
-    document.getElementById('p2-name-score').innerText = p2Name;
-}
-
-// --- Feature Toggles ---
-function toggleMusic() {
-    if (isMusicPlaying) {
-        music.pause();
-        document.getElementById('music-btn').innerText = "🔇 Music Off";
-        isMusicPlaying = false;
-    } else {
-        music.play().then(() => {
-            document.getElementById('music-btn').innerText = "🔊 Music On";
-            isMusicPlaying = true;
-        }).catch(error => {
-            console.log("Music play failed:", error);
-            alert("Ensure you are connected to the internet to load the music track!");
+    // --- Board Logic ---
+    function buildBoard() {
+        ui.board.innerHTML = '';
+        boardData.forEach((_, i) => {
+            const cube = document.createElement('div');
+            cube.classList.add('cube');
+            cube.dataset.index = i;
+            cube.innerHTML = `<div class="cube-face cube-face-front"></div><div class="cube-face cube-face-back"></div>`;
+            cube.addEventListener('click', () => handleMove(i, cube));
+            ui.board.appendChild(cube);
         });
     }
-}
 
-function toggleMode() {
-    if (mode === 'pvc') {
-        mode = 'pvp';
-        document.getElementById('mode-btn').innerText = "🎮 Mode: Player vs Player";
-        document.getElementById('p2-controls').style.display = "flex";
-        document.getElementById('p2-name-input').style.display = "inline-block";
-    } else {
-        mode = 'pvc';
-        document.getElementById('mode-btn').innerText = "🎮 Mode: vs Computer";
-        document.getElementById('p2-controls').style.display = "none";
-        document.getElementById('p2-name-input').style.display = "none";
+    function handleMove(index, cube) {
+        if (!isGameActive || boardData[index] !== "-") return;
+        if (gameMode === 'pvsystem' && currentPlayer === 'O') return; // Prevent clicking during AI turn
+
+        applyMove(index, cube, currentPlayer);
+
+        if (!checkWin()) {
+            currentPlayer = (currentPlayer === 'X') ? 'O' : 'X';
+            updateTurnUI();
+
+            if (gameMode === 'pvsystem' && currentPlayer === 'O') {
+                ui.status.innerText = "System Computing...";
+                fetchAIMoveFromJava();
+            }
+        }
     }
-    updateNames();
-    resetGame();
-}
 
-// --- Gameplay Logic ---
-function playP1(choice) {
-    p1Selected = choice;
-    p1ChoiceEl.innerText = icons[choice];
-    p1Result.innerText = "";
-    p2Result.innerText = "";
-    
-    if (mode === 'pvc') {
-        p2ChoiceEl.innerText = "⏳";
-        fetchResult(p1Selected, -1);
-    } else {
-        checkPvPReady();
+    function applyMove(index, cube, player) {
+        boardData[index] = player;
+        cube.classList.add('is-flipped', player === 'X' ? 'x-mark' : 'o-mark');
+        cube.querySelector('.cube-face-back').innerText = player;
     }
-}
 
-function playP2(choice) {
-    if (mode !== 'pvp') return;
-    p2Selected = choice;
-    p2ChoiceEl.innerText = "✅"; 
-    checkPvPReady();
-}
+    // --- Java Backend Integration ---
+    async function fetchAIMoveFromJava() {
+        try {
+            const boardStr = boardData.join('');
+            const response = await fetch(`http://localhost:8080/api/aimove?board=${boardStr}`);
+            const aiIndex = await response.text();
 
-function checkPvPReady() {
-    if (p1Selected !== -1 && p2Selected !== -1) {
-        fetchResult(p1Selected, p2Selected);
+            if (aiIndex !== "-1") {
+                const aiCube = document.querySelector(`.cube[data-index='${aiIndex}']`);
+                setTimeout(() => {
+                    applyMove(parseInt(aiIndex), aiCube, 'O');
+                    if (!checkWin()) {
+                        currentPlayer = 'X';
+                        updateTurnUI();
+                    }
+                }, 700);
+            }
+        } catch (error) {
+            ui.status.innerText = "Error: Start Java Server!";
+            speak("Error. Java Server is offline.");
+        }
     }
-}
 
-// --- Server Communication & Results ---
-async function fetchResult(p1, p2) {
-    try {
-        const response = await fetch(`/api/play?p1=${p1}&p2=${p2}`);
-        const data = await response.json();
+    // --- Game Rules & Visuals ---
+    function checkWin() {
+        const combos = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        let winner = null;
 
-        // Reveal choices
-        p2ChoiceEl.innerText = icons[data.p2Choice];
-
-        let resultMessage = "";
-
-        // Process Winner
-        if (data.winner === 1) {
-            resultMessage = `${p1Name.toUpperCase()} WINS! 🏆`;
-            score1++;
-            triggerCelebration();
-            speakVoice(`${p1Name} wins`);
-        } else if (data.winner === 2) {
-            resultMessage = `${p2Name.toUpperCase()} WINS! 🏆`;
-            score2++;
-            if(mode === 'pvp') triggerCelebration(); 
-            speakVoice(`${p2Name} wins`);
-        } else {
-            resultMessage = "TIE! 🤝";
-            speakVoice("It's a tie");
+        for (let c of combos) {
+            if (boardData[c[0]] !== "-" && boardData[c[0]] === boardData[c[1]] && boardData[c[0]] === boardData[c[2]]) {
+                winner = boardData[c[0]]; break;
+            }
         }
 
-        // Update UI Text & Score
-        p1Result.innerText = resultMessage;
-        p2Result.innerText = resultMessage;
-        document.getElementById('s1').innerText = score1;
-        document.getElementById('s2').innerText = score2;
-
-        p1Selected = -1;
-        p2Selected = -1;
-
-    } catch (error) {
-        console.error("Error:", error);
-        alert("Cannot connect to Java Backend. Make sure GameServer.java is running!");
+        if (winner) {
+            isGameActive = false;
+            scores[winner]++;
+            document.getElementById(`scoreP${winner === 'X' ? 1 : 2}`).innerText = scores[winner];
+            
+            ui.status.innerText = `🏆 ${names[winner]} WINS! 🏆`;
+            speak(`${names[winner]} wins the round! Excellent play.`);
+            fireMediumCrackers();
+            return true;
+        } else if (!boardData.includes("-")) {
+            isGameActive = false;
+            ui.status.innerText = "IT'S A DRAW!";
+            speak("The match is a draw. No winner.");
+            return true;
+        }
+        return false;
     }
-}
 
-// --- Fun Effects ---
-function triggerCelebration() {
-    confetti({
-        particleCount: 150,
-        spread: 80,
-        origin: { y: 0.6 }
-    });
-}
+    function updateTurnUI() {
+        if (currentPlayer === 'X') {
+            document.getElementById('cardP1').classList.add('active-turn');
+            document.getElementById('cardP2').classList.remove('active-turn');
+            ui.status.innerText = `${names.X}'s Turn`;
+        } else {
+            document.getElementById('cardP2').classList.add('active-turn');
+            document.getElementById('cardP1').classList.remove('active-turn');
+            ui.status.innerText = gameMode === 'pvsystem' ? "System Computing..." : `${names.O}'s Turn`;
+        }
+    }
 
-function speakVoice(text) {
-    window.speechSynthesis.cancel();
-    const speech = new SpeechSynthesisUtterance(text);
-    speech.volume = 1;
-    speech.rate = 1.0; 
-    speech.pitch = 1.2; 
-    window.speechSynthesis.speak(speech);
-}
+    function resetRound() {
+        boardData = ["-", "-", "-", "-", "-", "-", "-", "-", "-"];
+        isGameActive = true; currentPlayer = 'X';
+        buildBoard(); updateTurnUI();
+        speak("Round reset.");
+    }
 
-function resetGame() {
-    p1ChoiceEl.innerText = "❓";
-    p2ChoiceEl.innerText = "❓";
-    p1Result.innerText = "";
-    p2Result.innerText = "";
-    p1Selected = -1;
-    p2Selected = -1;
-    score1 = 0;
-    score2 = 0;
-    document.getElementById('s1').innerText = score1;
-    document.getElementById('s2').innerText = score2;
-}
+    // --- MEDIUM SIZED CELEBRATION CRACKERS ---
+    function fireMediumCrackers() {
+        const duration = 2500;
+        const end = Date.now() + duration;
+
+        (function frame() {
+            // Using scalar: 1.2 to make crackers Medium size
+            confetti({ particleCount: 7, angle: 60, spread: 70, origin: { x: 0 }, scalar: 1.2, colors: ['#00f3ff', '#ff0055', '#39ff14'] });
+            confetti({ particleCount: 7, angle: 120, spread: 70, origin: { x: 1 }, scalar: 1.2, colors: ['#00f3ff', '#ff0055', '#39ff14'] });
+
+            if (Date.now() < end) requestAnimationFrame(frame);
+        }());
+    }
+});

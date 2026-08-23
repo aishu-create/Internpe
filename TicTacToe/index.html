@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate 3D Tic-Tac-Toe</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Fireworks / Confetti Library -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+    <!-- Background Music Player -->
+    <audio id="bgMusic" loop>
+        <source src="music.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- Setup Modal -->
+    <div class="glass-modal" id="setupModal">
+        <div class="modal-content">
+            <h2 class="neon-title">GAME SETUP</h2>
+            
+            <label>Select Game Mode:</label>
+            <select id="modeSelect">
+                <option value="pvsystem">Player 1 vs System</option>
+                <option value="pvp">Player 1 vs Player 2</option>
+            </select>
+
+            <label>Player 1 (X) Name:</label>
+            <input type="text" id="p1Name" value="Player 1">
+
+            <label>Player 2 / System (O) Name:</label>
+            <input type="text" id="p2Name" value="System" disabled>
+
+            <button id="startGameBtn" class="neon-btn">INITIALIZE MATCH</button>
+        </div>
+    </div>
+
+    <!-- Main Game UI -->
+    <div class="game-container" id="gameUI" style="display: none;">
+        <button id="musicToggle">🔊 Music On</button>
+        
+        <!-- Scoreboard & Avatars -->
+        <div class="scoreboard">
+            <div class="player-card" id="cardP1">
+                <div class="avatar p1-avatar">🧑🏽‍🚀</div>
+                <div class="info">
+                    <h3 id="displayP1">Player 1</h3>
+                    <div class="score" id="scoreP1">0</div>
+                </div>
+            </div>
+
+            <div class="center-console">
+                <h2 id="statusText">Awaiting Setup...</h2>
+                <button id="resetRoundBtn" class="neon-btn small">Reset Round</button>
+            </div>
+
+            <div class="player-card right" id="cardP2">
+                <div class="info text-right">
+                    <h3 id="displayP2">System</h3>
+                    <div class="score" id="scoreP2">0</div>
+                </div>
+                <div class="avatar p2-avatar" id="avatarP2">🤖</div>
+            </div>
+        </div>
+
+        <!-- 3D Board Visualization -->
+        <div class="scene">
+            <div class="board" id="board"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

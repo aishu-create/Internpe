@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect Four 3D - Holographic Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            background: radial-gradient(circle at center, #101426 0%, #060814 100%);
+            color: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Glassmorphic Cyberpunk UI */
+        .glass-panel {
+            background: rgba(16, 24, 48, 0.65);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 255, 238, 0.25);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 255, 238, 0.15);
+            border-radius: 16px;
+        }
+
+        /* Header / HUD */
+        header {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            padding: 12px 30px;
+        }
+        .title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 900;
+            letter-spacing: 2px;
+            background: linear-gradient(90deg, #ff007f, #00f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 242, 254, 0.5);
+        }
+
+        /* Mode & Controls */
+        .controls {
+            position: absolute;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            gap: 15px;
+            padding: 12px 25px;
+        }
+        button, select {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(0, 242, 254, 0.4);
+            color: #fff;
+            padding: 10px 18px;
+            font-size: 1rem;
+            font-family: 'Orbitron', sans-serif;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            outline: none;
+        }
+        button:hover, select:hover {
+            background: rgba(0, 242, 254, 0.2);
+            border-color: #00f2fe;
+            box-shadow: 0 0 15px #00f2fe;
+            transform: translateY(-2px);
+        }
+
+        /* Status & Scoreboard */
+        .status-box {
+            position: absolute;
+            top: 20px;
+            right: 25px;
+            z-index: 10;
+            padding: 15px 25px;
+            text-align: right;
+            min-width: 220px;
+        }
+        .turn-indicator {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        .p1-color { color: #ff007f; text-shadow: 0 0 10px #ff007f; }
+        .p2-color { color: #00f2fe; text-shadow: 0 0 10px #00f2fe; }
+
+        /* Voice Assistant Monitor */
+        .voice-hud {
+            position: absolute;
+            left: 25px;
+            bottom: 25px;
+            z-index: 10;
+            padding: 15px 20px;
+            max-width: 320px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .ai-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #00f2fe 30%, #ff007f 100%);
+            box-shadow: 0 0 12px #00f2fe;
+            animation: pulse 2s infinite alternate;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.7; }
+            100% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 20px #ff007f; }
+        }
+        .ai-subtitle {
+            font-size: 0.95rem;
+            color: #d1d5db;
+            font-style: italic;
+        }
+
+        /* Column Selector Buttons in 3D Screen Overlay */
+        .column-triggers {
+            position: absolute;
+            top: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            z-index: 10;
+        }
+        .col-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <!-- Top Bar -->
+    <header class="glass-panel">
+        <div class="title">CONNECT 4 3D</div>
+    </header>
+
+    <!-- Top Column Drop Overlay -->
+    <div class="column-triggers" id="col-triggers">
+        <!-- 7 Buttons generated by JS -->
+    </div>
+
+    <!-- Status -->
+    <div class="status-box glass-panel">
+        <div class="turn-indicator" id="turn-txt">Turn: <span class="p1-color">PLAYER 1</span></div>
+        <div style="font-size: 0.9rem; color: #aaa;" id="mode-txt">Mode: Player vs System</div>
+    </div>
+
+    <!-- AI Voice Assistant Subtitle HUD -->
+    <div class="voice-hud glass-panel">
+        <div class="ai-avatar"></div>
+        <div>
+            <div style="font-size: 0.75rem; color: #00f2fe; font-weight: bold; letter-spacing: 1px;">A.I. COMMENTATOR</div>
+            <div class="ai-subtitle" id="voice-sub">"Welcome to the 3D Arena! Place your chip to start."</div>
+        </div>
+    </div>
+
+    <!-- Controls Bottom -->
+    <div class="controls glass-panel">
+        <select id="modeSelect">
+            <option value="pve">Player vs System (AI)</option>
+            <option value="pvp">Player 1 vs Player 2</option>
+        </select>
+        <button id="resetBtn">↻ Restart Match</button>
+        <button id="voiceToggle">🔊 Voice: ON</button>
+    </div>
+
+    <script>
+        // --- Game Matrix State ---
+        const ROWS = 6;
+        const COLS = 7;
+        let board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+        let currentPlayer = 1; // 1 = Pink/Red, 2 = Cyan/System
+        let gameOver = false;
+        let gameMode = 'pve';
+        let voiceEnabled = true;
+
+        // --- Three.js Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x060814, 0.03);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 3, 16);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 + 0.1;
+        controls.minDistance = 8;
+        controls.maxDistance = 25;
+
+        // --- Lights ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const p1Light = new THREE.PointLight(0xff007f, 3, 30);
+        p1Light.position.set(-6, 5, 8);
+        scene.add(p1Light);
+
+        const p2Light = new THREE.PointLight(0x00f2fe, 3, 30);
+        p2Light.position.set(6, 5, 8);
+        scene.add(p2Light);
+
+        // Grid Floor
+        const gridHelper = new THREE.GridHelper(30, 30, 0x00f2fe, 0x1f293d);
+        gridHelper.position.y = -4.5;
+        scene.add(gridHelper);
+
+        // --- 3D Board Creation (Neon-framed Acrylic Plate) ---
+        const pieceMeshes = [];
+        const SPACING = 1.35;
+        const X_OFFSET = (COLS - 1) * SPACING / 2;
+        const Y_OFFSET = (ROWS - 1) * SPACING / 2;
+
+        const boardGroup = new THREE.Group();
+
+        // Stand / Base
+        const baseGeo = new THREE.BoxGeometry(11, 0.4, 3);
+        const baseMat = new THREE.MeshStandardMaterial({ color: 0x1a2238, metalness: 0.8, roughness: 0.2 });
+        const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+        baseMesh.position.y = -3.8;
+        boardGroup.add(baseMesh);
+
+        // Holographic Board Frame
+        const frameGeo = new THREE.BoxGeometry(COLS * SPACING + 0.4, ROWS * SPACING + 0.4, 0.6);
+        const frameMat = new THREE.MeshPhysicalMaterial({
+            color: 0x0b132b,
+            metalness: 0.1,
+            roughness: 0.1,
+            transmission: 0.8,
+            transparent: true,
+            opacity: 0.85
+        });
+        const frameMesh = new THREE.Mesh(frameGeo, frameMat);
+        boardGroup.add(frameMesh);
+        scene.add(boardGroup);
+
+        // --- Voice Assistant Engine ---
+        function speak(text) {
+            document.getElementById('voice-sub').innerText = `"${text}"`;
+            if (!voiceEnabled || !('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.05;
+            utterance.pitch = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // --- Drop Token with 3D Animation ---
+        const animations = [];
+
+        function spawnPiece3D(row, col, player) {
+            const colorHex = player === 1 ? 0xff007f : 0x00f2fe;
+            const geo = new THREE.CylinderGeometry(0.55, 0.55, 0.35, 32);
+            geo.rotateX(Math.PI / 2);
+
+            const mat = new THREE.MeshStandardMaterial({
+                color: colorHex,
+                emissive: colorHex,
+                emissiveIntensity: 0.4,
+                metalness: 0.7,
+                roughness: 0.2
+            });
+
+            const mesh = new THREE.Mesh(geo, mat);
+            const targetX = col * SPACING - X_OFFSET;
+            const targetY = (ROWS - 1 - row) * SPACING - Y_OFFSET;
+
+            mesh.position.set(targetX, 8, 0); // Drop from above
+            boardGroup.add(mesh);
+            pieceMeshes.push(mesh);
+
+            animations.push({
+                mesh: mesh,
+                targetY: targetY,
+                speed: 0.25
+            });
+        }
+
+        // --- Game Logic ---
+        function dropPiece(col) {
+            if (gameOver) return;
+
+            let row = -1;
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (board[r][col] === 0) {
+                    row = r;
+                    break;
+                }
+            }
+
+            if (row === -1) {
+                speak("That column is full. Choose another slot.");
+                return;
+            }
+
+            board[row][col] = currentPlayer;
+            spawnPiece3D(row, col, currentPlayer);
+
+            if (checkWin(board, row, col, currentPlayer)) {
+                gameOver = true;
+                const winMsg = currentPlayer === 1 ? "Player 1 claims victory!" : (gameMode === 'pve' ? "System wins! Better luck next time." : "Player 2 wins!");
+                document.getElementById('turn-txt').innerHTML = `<span class="${currentPlayer === 1 ? 'p1-color' : 'p2-color'}">${winMsg}</span>`;
+                speak(winMsg);
+                return;
+            }
+
+            if (board.every(row => row.every(cell => cell !== 0))) {
+                gameOver = true;
+                document.getElementById('turn-txt').innerText = "Game Draw!";
+                speak("It's a stalemate! Well played both.");
+                return;
+            }
+
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            updateTurnHUD();
+
+            if (gameMode === 'pve' && currentPlayer === 2 && !gameOver) {
+                setTimeout(handleAiTurn, 650);
+            }
+        }
+
+        function updateTurnHUD() {
+            const turnTxt = document.getElementById('turn-txt');
+            if (currentPlayer === 1) {
+                turnTxt.innerHTML = `Turn: <span class="p1-color">PLAYER 1</span>`;
+            } else {
+                turnTxt.innerHTML = `Turn: <span class="p2-color">${gameMode === 'pve' ? 'SYSTEM (AI)' : 'PLAYER 2'}</span>`;
+            }
+        }
+
+        // AI Logic: Client-side Minimax fallback with backend hook
+        async function handleAiTurn() {
+            let col = -1;
+            try {
+                const response = await fetch('http://localhost:8080/api/game/ai-move', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ board: board, aiPlayer: 2 })
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    col = data.column;
+                }
+            } catch (e) {
+                // Fallback to local heuristic if Java server is offline
+                col = getLocalBestMove();
+            }
+
+            if (col !== -1) {
+                const commentary = ["Analyzing board matrix.", "Executing optimal counter-move.", "Fascinating choice, human.", "Processing next branch."];
+                speak(commentary[Math.floor(Math.random() * commentary.length)]);
+                dropPiece(col);
+            }
+        }
+
+        function getLocalBestMove() {
+            // Simple center-weighted available column picker
+            const order = [3, 2, 4, 1, 5, 0, 6];
+            for (let c of order) {
+                for (let r = ROWS - 1; r >= 0; r--) {
+                    if (board[r][c] === 0) return c;
+                }
+            }
+            return 0;
+        }
+
+        function checkWin(b, row, col, p) {
+            const directions = [[[0,1],[0,-1]], [[1,0],[-1,0]], [[1,1],[-1,-1]], [[1,-1],[-1,1]]];
+            for (let pair of directions) {
+                let count = 1;
+                for (let d of pair) {
+                    let r = row + d[0], c = col + d[1];
+                    while (r >= 0 && r < ROWS && c >= 0 && c < COLS && b[r][c] === p) {
+                        count++;
+                        r += d[0];
+                        c += d[1];
+                    }
+                }
+                if (count >= 4) return true;
+            }
+            return false;
+        }
+
+        function resetGame() {
+            board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+            pieceMeshes.forEach(mesh => boardGroup.remove(mesh));
+            pieceMeshes.length = 0;
+            animations.length = 0;
+            currentPlayer = 1;
+            gameOver = false;
+            updateTurnHUD();
+            speak("Board reset. Round 1, start!");
+        }
+
+        // --- Generate Drop Buttons ---
+        const triggersContainer = document.getElementById('col-triggers');
+        for (let i = 0; i < COLS; i++) {
+            const btn = document.createElement('button');
+            btn.className = 'col-btn';
+            btn.innerText = `↓`;
+            btn.onclick = () => {
+                if (gameMode === 'pve' && currentPlayer === 2) return;
+                dropPiece(i);
+            };
+            triggersContainer.appendChild(btn);
+        }
+
+        // Event Listeners
+        document.getElementById('resetBtn').onclick = resetGame;
+        document.getElementById('modeSelect').onchange = (e) => {
+            gameMode = e.target.value;
+            document.getElementById('mode-txt').innerText = `Mode: ${e.target.options[e.target.selectedIndex].text}`;
+            resetGame();
+        };
+        document.getElementById('voiceToggle').onclick = (e) => {
+            voiceEnabled = !voiceEnabled;
+            e.target.innerText = `🔊 Voice: ${voiceEnabled ? 'ON' : 'OFF'}`;
+        };
+
+        // Window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- Render Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Animate falling pieces
+            for (let i = animations.length - 1; i >= 0; i--) {
+                const anim = animations[i];
+                if (anim.mesh.position.y > anim.targetY) {
+                    anim.mesh.position.y -= anim.speed;
+                    anim.speed += 0.02; // gravity acceleration
+                } else {
+                    anim.mesh.position.y = anim.targetY;
+                    animations.splice(i, 1);
+                }
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
